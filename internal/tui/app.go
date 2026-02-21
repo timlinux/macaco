@@ -456,7 +456,11 @@ func (a *App) renderGame() string {
 			targetPos := task.CursorEnd
 
 			// Build caret line: spaces up to target, then ^
+			// Must be same length as desired text for alignment
 			caretLine := strings.Repeat(" ", targetPos) + "^"
+
+			// Combine reference text and caret as a single block so they stay aligned
+			referenceBlock := task.Desired + "\n" + caretLine
 
 			// Instruction for motion task
 			instruction := "Move your cursor to the caret (^)"
@@ -465,8 +469,7 @@ func (a *App) renderGame() string {
 				lipgloss.Center,
 				statusStyle.Render(displayBuffer),
 				"",
-				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Render(task.Desired),
-				a.styles.Hint.Foreground(a.styles.Theme.Warning).Render(caretLine),
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Render(referenceBlock),
 				"",
 				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Render(instruction),
 			)
