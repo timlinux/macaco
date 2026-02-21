@@ -157,6 +157,12 @@ The application SHALL provide immediate visual feedback on the current buffer st
   - Text SHALL be yellow/orange (#F59E0B) to indicate changes in progress
   - Individual characters MAY be highlighted differently to show diff
 
+**Motion Task Display:**
+  - For motion-only tasks (where initial text == desired text), display SHALL include:
+    - Current cursor position indicated with block character (█) in the buffer text
+    - A caret (^) indicator below the desired text showing target cursor position
+  - This provides clear visual guidance for where the cursor must be moved
+
 - **Character-Level Diff (Optional Enhancement):**
   - Incorrect characters SHALL be underlined in red
   - Missing characters SHALL be indicated with gray placeholders
@@ -2172,8 +2178,13 @@ Example:
 - Spacing: 2 rows
 - Next task: 1 row
 - Bottom margin: 2 rows
-- Footer: 1 row
+- Footer: 1 row (MUST be anchored to bottom of terminal)
 - **Total:** Minimum 19 rows (fits in 24-row terminal)
+
+**Footer Anchoring:**
+- The footer SHALL always be positioned at the bottom of the terminal
+- Content area SHALL flex to fill available space
+- Footer position is calculated dynamically based on terminal height
 
 #### Animations
 

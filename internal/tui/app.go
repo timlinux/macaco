@@ -96,6 +96,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		a.lastUpdate = time.Time(msg)
 		return a, tickCmd()
+
+	case completeTaskMsg:
+		// Auto-advance to next task
+		a.completeTask()
+		return a, nil
 	}
 
 	return a, nil
@@ -406,7 +411,7 @@ func (a *App) renderGame() string {
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
-	// Previous task
+	// Previous task (dimmed)
 	if prev := a.session.PreviousTask(); prev != nil {
 		prevText := fmt.Sprintf("%q -> %q", prev.Initial, prev.Desired)
 		b.WriteString(a.styles.PreviousTask.Width(a.width).Render(prevText))
@@ -418,30 +423,55 @@ func (a *App) renderGame() string {
 	// Current task
 	task := a.session.CurrentTask()
 	if task != nil {
-		// Buffer display
+		// Buffer display - current state with cursor
 		bufferText := a.session.BufferText()
 		statusStyle := a.styles.BufferStyle(a.matchStatus.String())
 
-		// Add cursor indicator
+		// Build display with cursor block
 		cursorIdx := a.session.CursorIndex()
-		if cursorIdx < len(bufferText) {
-			runes := []rune(bufferText)
-			if cursorIdx < len(runes) {
-				bufferText = string(runes[:cursorIdx]) + "█" + string(runes[cursorIdx+1:])
-			}
+		runes := []rune(bufferText)
+		var displayBuffer string
+		if cursorIdx >= 0 && cursorIdx < len(runes) {
+			displayBuffer = string(runes[:cursorIdx]) + "█" + string(runes[cursorIdx+1:])
+		} else if cursorIdx >= len(runes) && len(runes) > 0 {
+			displayBuffer = bufferText + "█"
+		} else {
+			displayBuffer = bufferText
 		}
 
-		taskDisplay := lipgloss.JoinVertical(
-			lipgloss.Center,
-			statusStyle.Width(a.width-8).Render(bufferText),
-			a.styles.Separator.Render("  ↓  "),
-			a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Width(a.width-8).Render(task.Desired),
-		)
+		// Check if this is a motion task (text stays same, only cursor moves)
+		isMotionTask := task.IsMotionTask()
 
-		b.WriteString(lipgloss.Place(a.width, 10, lipgloss.Center, lipgloss.Center, taskDisplay))
+		var taskDisplay string
+		if isMotionTask {
+			// For motion tasks, show desired text with caret indicating target position
+			targetPos := task.CursorEnd
+			desiredRunes := []rune(task.Desired)
+
+			// Build caret line: spaces up to target, then ^
+			caretLine := strings.Repeat(" ", targetPos) + "^"
+
+			taskDisplay = lipgloss.JoinVertical(
+				lipgloss.Center,
+				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
+				a.styles.Separator.Render("  ↓  "),
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Width(a.width-8).Align(lipgloss.Center).Render(string(desiredRunes)),
+				a.styles.Hint.Foreground(a.styles.Theme.Warning).Align(lipgloss.Center).Render(caretLine),
+			)
+		} else {
+			// For non-motion tasks, show initial -> desired transformation
+			taskDisplay = lipgloss.JoinVertical(
+				lipgloss.Center,
+				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
+				a.styles.Separator.Render("  ↓  "),
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Width(a.width-8).Align(lipgloss.Center).Render(task.Desired),
+			)
+		}
+
+		b.WriteString(lipgloss.Place(a.width, 12, lipgloss.Center, lipgloss.Center, taskDisplay))
 		b.WriteString("\n\n")
 
-		// Hint
+		// Hint (if enabled)
 		if a.showHint {
 			hint := a.getHint(task)
 			b.WriteString(a.styles.Hint.Width(a.width).Align(lipgloss.Center).Render(hint))
@@ -449,21 +479,33 @@ func (a *App) renderGame() string {
 		}
 	}
 
-	// Next task
+	// Next task preview (dimmed)
 	if next := a.session.NextTask(); next != nil {
 		nextText := fmt.Sprintf("%q -> %q", next.Initial, next.Desired)
 		b.WriteString(a.styles.NextTask.Width(a.width).Render(nextText))
 	}
 
+	// Build main content
+	mainContent := b.String()
+	mainContentHeight := lipgloss.Height(mainContent)
+
 	// Footer
 	footer := a.renderFooter()
+	footerHeight := lipgloss.Height(footer)
 
-	// Combine with footer at bottom
-	mainContent := b.String()
+	// Calculate padding to push footer to bottom
+	// Total height - header/content height - footer height = padding needed
+	paddingHeight := a.height - mainContentHeight - footerHeight
+	if paddingHeight < 0 {
+		paddingHeight = 0
+	}
+
+	// Build final layout with footer anchored to bottom
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		mainContent,
-		lipgloss.Place(a.width, 3, lipgloss.Left, lipgloss.Bottom, footer),
+		strings.Repeat("\n", paddingHeight),
+		footer,
 	)
 }
 
