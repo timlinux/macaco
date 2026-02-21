@@ -411,14 +411,14 @@ func (a *App) renderGame() string {
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
-	// Previous task (dimmed)
-	if prev := a.session.PreviousTask(); prev != nil {
-		prevText := fmt.Sprintf("%q -> %q", prev.Initial, prev.Desired)
-		b.WriteString(a.styles.PreviousTask.Width(a.width).Render(prevText))
-		b.WriteString("\n\n")
-	} else {
-		b.WriteString("\n\n")
+	// Previous task (dimmed) - only show if not the first task
+	if a.session.CurrentIndex > 0 {
+		if prev := a.session.PreviousTask(); prev != nil {
+			prevText := fmt.Sprintf("%q -> %q", prev.Initial, prev.Desired)
+			b.WriteString(a.styles.PreviousTask.Width(a.width).Render(prevText))
+		}
 	}
+	b.WriteString("\n\n")
 
 	// Current task
 	task := a.session.CurrentTask()
@@ -444,31 +444,37 @@ func (a *App) renderGame() string {
 
 		var taskDisplay string
 		if isMotionTask {
-			// For motion tasks, show desired text with caret indicating target position
+			// For motion tasks, show text with caret directly under it indicating target position
 			targetPos := task.CursorEnd
-			desiredRunes := []rune(task.Desired)
 
 			// Build caret line: spaces up to target, then ^
 			caretLine := strings.Repeat(" ", targetPos) + "^"
 
+			// Instruction for motion task
+			instruction := "Move your cursor to the caret (^)"
+
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
 				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
-				a.styles.Separator.Render("  ↓  "),
-				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Width(a.width-8).Align(lipgloss.Center).Render(string(desiredRunes)),
-				a.styles.Hint.Foreground(a.styles.Theme.Warning).Align(lipgloss.Center).Render(caretLine),
+				a.styles.Hint.Foreground(a.styles.Theme.Warning).Render(caretLine),
+				"",
+				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Align(lipgloss.Center).Render(instruction),
 			)
 		} else {
 			// For non-motion tasks, show initial -> desired transformation
+			instruction := "Transform the text above to match the text below"
+
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
 				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
 				a.styles.Separator.Render("  ↓  "),
-				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Width(a.width-8).Align(lipgloss.Center).Render(task.Desired),
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Success).Width(a.width-8).Align(lipgloss.Center).Render(task.Desired),
+				"",
+				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Align(lipgloss.Center).Render(instruction),
 			)
 		}
 
-		b.WriteString(lipgloss.Place(a.width, 12, lipgloss.Center, lipgloss.Center, taskDisplay))
+		b.WriteString(lipgloss.Place(a.width, 10, lipgloss.Center, lipgloss.Center, taskDisplay))
 		b.WriteString("\n\n")
 
 		// Hint (if enabled)
@@ -479,9 +485,14 @@ func (a *App) renderGame() string {
 		}
 	}
 
-	// Next task preview (dimmed)
+	// Next task preview (dimmed) - show the actual next task
 	if next := a.session.NextTask(); next != nil {
-		nextText := fmt.Sprintf("%q -> %q", next.Initial, next.Desired)
+		var nextText string
+		if next.IsMotionTask() {
+			nextText = fmt.Sprintf("Next: %q (move cursor)", next.Initial)
+		} else {
+			nextText = fmt.Sprintf("Next: %q -> %q", next.Initial, next.Desired)
+		}
 		b.WriteString(a.styles.NextTask.Width(a.width).Render(nextText))
 	}
 

@@ -160,8 +160,21 @@ The application SHALL provide immediate visual feedback on the current buffer st
 **Motion Task Display:**
   - For motion-only tasks (where initial text == desired text), display SHALL include:
     - Current cursor position indicated with block character (█) in the buffer text
-    - A caret (^) indicator below the desired text showing target cursor position
+    - A caret (^) indicator directly below the text showing target cursor position
+    - Clear instruction text: "Move your cursor to the caret (^)"
   - This provides clear visual guidance for where the cursor must be moved
+
+**Editing Task Display:**
+  - For editing tasks (where text transformation is required), display SHALL include:
+    - Current buffer text with cursor indicator
+    - Arrow separator (↓) between current and desired state
+    - Desired text shown in success color
+    - Clear instruction text: "Transform the text above to match the text below"
+
+**Previous/Next Task Indicators:**
+  - Previous task indicator SHALL be blank when on the first task of a round
+  - Next task indicator SHALL show the actual next task in the queue (not the current task)
+  - For motion tasks in previews, indicate "(move cursor)" instead of showing identical text
 
 - **Character-Level Diff (Optional Enhancement):**
   - Incorrect characters SHALL be underlined in red
