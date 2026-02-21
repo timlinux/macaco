@@ -539,7 +539,7 @@ func (a *App) renderHeader() string {
 	modeStyle := a.styles.ModeStyle(mode)
 	modeStr := modeStyle.Render(fmt.Sprintf("[%s]", mode))
 
-	// Progress
+	// Progress - prominent display like baboon
 	progress := fmt.Sprintf("Task %d/%d", a.session.CurrentIndex+1, a.session.TotalTasks)
 
 	// Timer
@@ -559,18 +559,30 @@ func (a *App) renderHeader() string {
 	}
 
 	left := fmt.Sprintf("MoCaCo | %s | %s", a.roundType, category)
-	right := fmt.Sprintf("%s | %s %s %s", progress, timer, modeStr, paused)
+	center := progress
+	right := fmt.Sprintf("%s %s %s", timer, modeStr, paused)
 
+	// Calculate spacing for three-column layout
 	headerWidth := a.width - 4
 	leftWidth := lipgloss.Width(left)
+	centerWidth := lipgloss.Width(center)
 	rightWidth := lipgloss.Width(right)
-	padding := headerWidth - leftWidth - rightWidth
-	if padding < 0 {
-		padding = 1
+
+	// Calculate padding on each side of center
+	totalUsed := leftWidth + centerWidth + rightWidth
+	remainingSpace := headerWidth - totalUsed
+	leftPadding := remainingSpace / 2
+	rightPadding := remainingSpace - leftPadding
+
+	if leftPadding < 1 {
+		leftPadding = 1
+	}
+	if rightPadding < 1 {
+		rightPadding = 1
 	}
 
 	return a.styles.Header.Width(a.width).Render(
-		left + strings.Repeat(" ", padding) + right,
+		left + strings.Repeat(" ", leftPadding) + center + strings.Repeat(" ", rightPadding) + right,
 	)
 }
 
