@@ -11,6 +11,7 @@ import (
 type Engine struct {
 	cfg          *config.Config
 	taskDB       *TaskDatabase
+	generator    *TaskGenerator
 	sessions     map[string]*Session
 	statsTracker *stats.Tracker
 	mu           sync.RWMutex
@@ -23,34 +24,50 @@ func NewEngine(cfg *config.Config) *Engine {
 		var err error
 		taskDB, err = LoadTaskDatabase(cfg.TasksFile)
 		if err != nil {
-			// Fall back to embedded tasks
-			taskDB = NewEmbeddedTaskDatabase()
+			// Fall back to generated tasks
+			taskDB = NewGeneratedTaskDatabase()
 		}
 	} else {
-		taskDB = NewEmbeddedTaskDatabase()
+		// Use procedurally generated tasks by default
+		taskDB = NewGeneratedTaskDatabase()
 	}
 
 	tracker, _ := stats.NewTracker(cfg.StatsFile)
+	generator := NewTaskGenerator()
 
 	return &Engine{
 		cfg:          cfg,
 		taskDB:       taskDB,
+		generator:    generator,
 		sessions:     make(map[string]*Session),
 		statsTracker: tracker,
 	}
 }
 
-// CreateSession creates a new game session
+// CreateSession creates a new game session with procedurally generated tasks
 func (e *Engine) CreateSession(roundType string) *Session {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	tasks := e.taskDB.GetTasksForRound(roundType)
-	session := NewSession(roundType, tasks)
+	// Generate fresh tasks for this session using public domain texts
+	tasks := e.generator.GenerateTasksForRound(roundType)
+
+	// Convert to pointers
+	taskPtrs := make([]*Task, len(tasks))
+	for i := range tasks {
+		taskPtrs[i] = &tasks[i]
+	}
+
+	session := NewSession(roundType, taskPtrs)
 	session.StartTask()
 
 	e.sessions[session.ID] = session
 	return session
+}
+
+// GetTextAttribution returns attribution for the public domain texts used
+func (e *Engine) GetTextAttribution() string {
+	return e.generator.GetAttribution()
 }
 
 // GetSession retrieves a session by ID

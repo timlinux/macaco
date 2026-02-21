@@ -73,12 +73,38 @@ func LoadTaskDatabase(path string) (*TaskDatabase, error) {
 }
 
 // NewEmbeddedTaskDatabase creates a task database with built-in tasks
+// Deprecated: Use NewGeneratedTaskDatabase for procedurally generated tasks
 func NewEmbeddedTaskDatabase() *TaskDatabase {
 	db := &TaskDatabase{
 		Version:     "1.0.0",
 		LastUpdated: "2026-02-21",
 		Rounds:      make(map[string]RoundDef),
 		Tasks:       getEmbeddedTasks(),
+	}
+	db.buildLookups()
+	db.buildRounds()
+	return db
+}
+
+// NewGeneratedTaskDatabase creates a task database with procedurally generated tasks
+// using public domain texts from classic literature
+func NewGeneratedTaskDatabase() *TaskDatabase {
+	generator := NewTaskGenerator()
+
+	// Generate tasks for all round types to populate the database
+	var allTasks []Task
+	roundTypes := []string{"beginner", "intermediate", "advanced", "expert"}
+
+	for _, roundType := range roundTypes {
+		tasks := generator.GenerateTasksForRound(roundType)
+		allTasks = append(allTasks, tasks...)
+	}
+
+	db := &TaskDatabase{
+		Version:     "2.0.0",
+		LastUpdated: "2026-02-21",
+		Rounds:      make(map[string]RoundDef),
+		Tasks:       allTasks,
 	}
 	db.buildLookups()
 	db.buildRounds()

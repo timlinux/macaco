@@ -855,6 +855,37 @@ Within each category, tasks MAY be randomized, but:
 
 ## Task Database
 
+### Procedural Task Generation
+
+Tasks are procedurally generated using sample text from **public domain literature**. This approach provides:
+
+- **Variety:** Each session presents unique text combinations
+- **Scalability:** Unlimited task generation without manual authoring
+- **Legal Compliance:** All source texts are in the public domain (published pre-1928)
+
+#### Text Sources
+
+All texts are sourced from [Project Gutenberg](https://www.gutenberg.org):
+
+| Work | Author | Year | License |
+|------|--------|------|---------|
+| Pride and Prejudice | Jane Austen | 1813 | Public Domain |
+| A Tale of Two Cities | Charles Dickens | 1859 | Public Domain |
+| The Adventures of Sherlock Holmes | Arthur Conan Doyle | 1892 | Public Domain |
+| Moby Dick | Herman Melville | 1851 | Public Domain |
+| Alice's Adventures in Wonderland | Lewis Carroll | 1865 | Public Domain |
+
+#### Generation Algorithm
+
+The task generator:
+1. Selects random sentences from the public domain corpus
+2. Applies vim operation templates based on task category
+3. Calculates optimal keystroke sequences
+4. Assigns difficulty based on operation complexity
+5. Ensures 30 tasks per round (6 motion, 6 delete, 6 change, 6 insert, 3 visual, 3 complex)
+
+See `LICENSE_TEXTS.md` for full attribution and licensing details.
+
 ### Task Categories and Examples
 
 #### Motion Tasks (6 per round)
