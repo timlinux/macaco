@@ -183,10 +183,27 @@ The application SHALL provide immediate visual feedback on the current buffer st
   - This provides visual pattern recognition for faster task comprehension
   - Task struct includes `HighlightStart` and `HighlightEnd` fields to define highlight range
 
-- **Character-Level Diff (Optional Enhancement):**
-  - Incorrect characters SHALL be underlined in red
-  - Missing characters SHALL be indicated with gray placeholders
-  - Extra characters SHALL have red background
+- **Character-Level Diff Highlighting:**
+  The application SHALL provide character-level color coding to help users quickly identify what needs to be done:
+
+  - **Delete (Red):** Characters that need to be deleted SHALL be rendered in red (`#EF4444`)
+    - Bold text for visibility
+    - Indicates text that must be removed to match desired state
+
+  - **Change (Orange):** Characters that need to be modified SHALL be rendered in orange (`#F59E0B`)
+    - Bold text for visibility
+    - Indicates text that must be changed (e.g., case change, character substitution)
+
+  - **Target (Green):** The cursor target position SHALL be rendered in green (`#10B981`)
+    - Bold text with underline for emphasis
+    - Used for motion tasks to show where the cursor needs to move
+    - Only the single target character is highlighted
+
+  - **Highlighting Behavior:**
+    - Character highlighting SHALL only appear while buffer matches initial state
+    - Once user begins editing, highlighting is disabled (buffer differs from initial)
+    - This provides visual guidance for pattern recognition before action
+    - Highlighting is calculated by comparing initial text with desired text character-by-character
 
 ### FR-004: Standardized Round Structure
 
@@ -2914,6 +2931,14 @@ The command <span class="vim-command">ciw</span> changes the inner word.
 | Error | Red 500 | `#ef4444` |
 | Warning | Amber 500 | `#f59e0b` |
 | Info | Blue 500 | `#0ea5e9` |
+
+**Character Highlighting Colors:**
+
+| Highlight Type | Color | Hex | Usage |
+|----------------|-------|-----|-------|
+| Delete | Red 500 | `#ef4444` | Characters to be deleted |
+| Change | Amber 500 | `#f59e0b` | Characters to be modified |
+| Target | Green 500 | `#10b981` | Cursor target position (motion tasks) |
 
 **Grayscale:**
 - 50: `#f9fafb`

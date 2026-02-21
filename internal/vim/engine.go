@@ -542,70 +542,164 @@ func (e *Engine) handleTextObject(op, motion string, count int) (bool, string) {
 	line := e.buffer.CurrentLine()
 	runes := []rune(line)
 
-	var startIdx, endIdx int
+	// For word objects, calculate directly on the line
+	var wordStart, wordEnd int
 
 	switch obj {
 	case 'w': // word
-		// Find word boundaries
 		x := e.buffer.cursorX
 		if x >= len(runes) {
 			return true, motion
 		}
 
 		// Find start of word
-		start := x
+		wordStart = x
 		class := classifyChar(runes[x])
-		for start > 0 && classifyChar(runes[start-1]) == class {
-			start--
+		for wordStart > 0 && classifyChar(runes[wordStart-1]) == class {
+			wordStart--
 		}
 
-		// Find end of word
-		end := x
-		for end < len(runes)-1 && classifyChar(runes[end+1]) == class {
-			end++
+		// Find end of word (exclusive index, points past last char of word)
+		wordEnd = x
+		for wordEnd < len(runes) && classifyChar(runes[wordEnd]) == class {
+			wordEnd++
 		}
 
 		if !inner {
 			// Include trailing whitespace for 'aw'
-			for end < len(runes)-1 && unicode.IsSpace(runes[end+1]) {
-				end++
+			for wordEnd < len(runes) && unicode.IsSpace(runes[wordEnd]) {
+				wordEnd++
+			}
+			// If no trailing space, include leading space
+			if wordEnd == x+1 || (wordEnd < len(runes) && !unicode.IsSpace(runes[wordEnd-1])) {
+				for wordStart > 0 && unicode.IsSpace(runes[wordStart-1]) {
+					wordStart--
+				}
 			}
 		}
 
-		e.buffer.cursorX = start
-		startIdx = e.buffer.CursorIndex()
-		e.buffer.cursorX = end + 1
-		endIdx = e.buffer.CursorIndex()
+		if wordStart >= wordEnd {
+			e.buffer.SetCursorPosition(startX, startY)
+			return true, motion
+		}
+
+		// Perform operation directly
+		e.saveUndo()
+		e.buffer.cursorX = wordStart
+		numChars := wordEnd - wordStart
+
+		switch op {
+		case "d":
+			deleted := e.buffer.Delete(numChars)
+			e.buffer.SetRegister(deleted)
+		case "c":
+			deleted := e.buffer.Delete(numChars)
+			e.buffer.SetRegister(deleted)
+			e.buffer.SetMode(ModeInsert)
+		case "y":
+			e.buffer.SetRegister(string(runes[wordStart:wordEnd]))
+			e.buffer.SetCursorPosition(startX, startY)
+		}
+
+		return true, motion
 
 	case '"', '\'', '`': // quotes
 		quote := rune(obj)
-		// Find opening quote
+		x := e.buffer.cursorX
+
+		// Strategy: find the quote pair that surrounds cursor,
+		// or if cursor is not inside quotes, find the next pair
 		openIdx := -1
 		closeIdx := -1
-		for i, r := range runes {
-			if r == quote {
-				if openIdx == -1 {
+
+		// First, check if cursor is inside a quote pair
+		// Look backward for opening quote
+		for i := x; i >= 0; i-- {
+			if runes[i] == quote {
+				// Count quotes before this to determine if it's open or close
+				quoteCount := 0
+				for j := 0; j < i; j++ {
+					if runes[j] == quote {
+						quoteCount++
+					}
+				}
+				// If even number of quotes before, this is an opening quote
+				if quoteCount%2 == 0 {
 					openIdx = i
-				} else {
+					break
+				}
+			}
+		}
+
+		// If we found an opening quote, look forward for closing quote
+		if openIdx != -1 {
+			for i := openIdx + 1; i < len(runes); i++ {
+				if runes[i] == quote {
 					closeIdx = i
 					break
 				}
 			}
 		}
+
+		// If cursor not inside quotes, find next pair from cursor position
+		if openIdx == -1 || closeIdx == -1 || x > closeIdx {
+			openIdx = -1
+			closeIdx = -1
+			for i := x; i < len(runes); i++ {
+				if runes[i] == quote {
+					if openIdx == -1 {
+						openIdx = i
+					} else {
+						closeIdx = i
+						break
+					}
+				}
+			}
+		}
+
 		if openIdx == -1 || closeIdx == -1 {
 			return true, motion
 		}
+
+		var start, end int
 		if inner {
-			e.buffer.cursorX = openIdx + 1
-			startIdx = e.buffer.CursorIndex()
-			e.buffer.cursorX = closeIdx
-			endIdx = e.buffer.CursorIndex()
+			start = openIdx + 1
+			end = closeIdx
 		} else {
-			e.buffer.cursorX = openIdx
-			startIdx = e.buffer.CursorIndex()
-			e.buffer.cursorX = closeIdx + 1
-			endIdx = e.buffer.CursorIndex()
+			start = openIdx
+			end = closeIdx + 1
 		}
+
+		if start > end {
+			return true, motion
+		}
+
+		e.saveUndo()
+		e.buffer.cursorX = start
+		numChars := end - start
+
+		// Handle empty inner quotes (start == end)
+		if numChars == 0 && op == "c" {
+			e.buffer.SetMode(ModeInsert)
+			return true, motion
+		}
+
+		if numChars > 0 {
+			switch op {
+			case "d":
+				deleted := e.buffer.Delete(numChars)
+				e.buffer.SetRegister(deleted)
+			case "c":
+				deleted := e.buffer.Delete(numChars)
+				e.buffer.SetRegister(deleted)
+				e.buffer.SetMode(ModeInsert)
+			case "y":
+				e.buffer.SetRegister(string(runes[start:end]))
+				e.buffer.SetCursorPosition(startX, startY)
+			}
+		}
+
+		return true, motion
 
 	case '(', ')', 'b': // parentheses
 		return e.handleBracketObject(op, '(', ')', inner, motion)
@@ -619,33 +713,6 @@ func (e *Engine) handleTextObject(op, motion string, count int) (bool, string) {
 	default:
 		return true, motion
 	}
-
-	if startIdx >= endIdx {
-		e.buffer.SetCursorPosition(startX, startY)
-		return true, motion
-	}
-
-	// Perform operation
-	e.saveUndo()
-	e.buffer.SetCursorIndex(startIdx)
-
-	switch op {
-	case "d":
-		deleted := e.buffer.Delete(endIdx - startIdx)
-		e.buffer.SetRegister(deleted)
-	case "c":
-		deleted := e.buffer.Delete(endIdx - startIdx)
-		e.buffer.SetRegister(deleted)
-		e.buffer.SetMode(ModeInsert)
-	case "y":
-		text := e.buffer.Text()
-		if startIdx < len(text) && endIdx <= len(text) {
-			e.buffer.SetRegister(text[startIdx:endIdx])
-		}
-		e.buffer.SetCursorPosition(startX, startY)
-	}
-
-	return true, motion
 }
 
 // handleBracketObject handles bracket text objects

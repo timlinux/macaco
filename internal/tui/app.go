@@ -404,12 +404,23 @@ func (a *App) renderGame() string {
 		return "No active session"
 	}
 
-	var b strings.Builder
-
-	// Header
+	// Header - always at top
 	header := a.renderHeader()
-	b.WriteString(header)
-	b.WriteString("\n\n")
+
+	// Footer - always at bottom
+	footer := a.renderFooter()
+
+	// Calculate available height for content (between header and footer)
+	headerHeight := lipgloss.Height(header)
+	footerHeight := lipgloss.Height(footer)
+	contentHeight := a.height - headerHeight - footerHeight - 2 // -2 for spacing
+
+	if contentHeight < 10 {
+		contentHeight = 10
+	}
+
+	// Build content area
+	var content strings.Builder
 
 	// Previous task (dimmed) - only show if we have completed at least one task
 	if a.session.CurrentIndex > 0 {
@@ -420,11 +431,11 @@ func (a *App) renderGame() string {
 			} else {
 				prevText = fmt.Sprintf("Previous: %q -> %q", prev.Initial, prev.Desired)
 			}
-			b.WriteString(a.styles.PreviousTask.Width(a.width).Align(lipgloss.Center).Render(prevText))
-			b.WriteString("\n")
+			content.WriteString(a.styles.PreviousTask.Width(a.width).Align(lipgloss.Center).Render(prevText))
+			content.WriteString("\n")
 		}
 	}
-	b.WriteString("\n")
+	content.WriteString("\n")
 
 	// Current task
 	task := a.session.CurrentTask()
@@ -468,24 +479,27 @@ func (a *App) renderGame() string {
 			// For non-motion tasks, show initial -> desired transformation
 			instruction := "Transform the text above to match the text below"
 
+			// Render desired text with highlighting for insertions
+			desiredDisplay := a.renderDesiredWithHighlight(task)
+
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
 				displayBuffer,
 				a.styles.Separator.Render("↓"),
-				a.styles.CurrentTask.Foreground(a.styles.Theme.Success).Render(task.Desired),
+				desiredDisplay,
 				"",
 				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Render(instruction),
 			)
 		}
 
-		b.WriteString(lipgloss.Place(a.width, 12, lipgloss.Center, lipgloss.Center, taskDisplay))
-		b.WriteString("\n")
+		content.WriteString(lipgloss.Place(a.width, contentHeight-6, lipgloss.Center, lipgloss.Center, taskDisplay))
+		content.WriteString("\n")
 
 		// Hint (if enabled)
 		if a.showHint {
 			hint := a.getHint(task)
-			b.WriteString(a.styles.Hint.Width(a.width).Align(lipgloss.Center).Render(hint))
-			b.WriteString("\n")
+			content.WriteString(a.styles.Hint.Width(a.width).Align(lipgloss.Center).Render(hint))
+			content.WriteString("\n")
 		}
 	}
 
@@ -497,29 +511,14 @@ func (a *App) renderGame() string {
 		} else {
 			nextText = fmt.Sprintf("Next: %q -> %q", next.Initial, next.Desired)
 		}
-		b.WriteString(a.styles.NextTask.Width(a.width).Align(lipgloss.Center).Render(nextText))
+		content.WriteString(a.styles.NextTask.Width(a.width).Align(lipgloss.Center).Render(nextText))
 	}
 
-	// Build main content
-	mainContent := b.String()
-	mainContentHeight := lipgloss.Height(mainContent)
-
-	// Footer
-	footer := a.renderFooter()
-	footerHeight := lipgloss.Height(footer)
-
-	// Calculate padding to push footer to bottom
-	// Total height - header/content height - footer height = padding needed
-	paddingHeight := a.height - mainContentHeight - footerHeight
-	if paddingHeight < 0 {
-		paddingHeight = 0
-	}
-
-	// Build final layout with footer anchored to bottom
+	// Build final layout: header at top, content in middle, footer at bottom
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		mainContent,
-		strings.Repeat("\n", paddingHeight),
+		header,
+		content.String(),
 		footer,
 	)
 }
@@ -713,90 +712,67 @@ Press ESC or ? to close this help
 
 // Helper functions
 
-// renderBufferWithHighlight renders the buffer text with cursor and optional highlighting
-// for delete/change tasks, the target text to modify is highlighted in a different color
+// renderBufferWithHighlight renders the buffer text with cursor and character-level highlighting
+// Red = characters to delete, Orange = characters to change, Green = cursor target (motion tasks)
 func (a *App) renderBufferWithHighlight(text string, cursorIdx int, task *game.Task) string {
 	runes := []rune(text)
 	statusStyle := a.styles.BufferStyle(a.matchStatus.String())
 
-	// If task has highlighting and buffer matches initial (hasn't been modified yet)
-	if task.HasHighlight() && text == task.Initial {
-		highlightStart := task.HighlightStart
-		highlightEnd := task.HighlightEnd
+	// Get character-level highlights if buffer matches initial (hasn't been modified yet)
+	if text == task.Initial {
+		highlights := task.GetCharHighlights()
 
-		// Clamp to valid range
-		if highlightStart < 0 {
-			highlightStart = 0
-		}
-		if highlightEnd > len(runes) {
-			highlightEnd = len(runes)
-		}
+		// Define ANSI color codes for inline styling (avoids lipgloss per-char issues)
+		// Red for delete, Orange/Yellow for change, Green for target
+		const (
+			colorReset  = "\033[0m"
+			colorRed    = "\033[1;31m" // Bold red
+			colorOrange = "\033[1;33m" // Bold yellow/orange
+			colorGreen  = "\033[1;32;4m" // Bold green underlined
+		)
 
-		// Build the display with highlighting
-		var result string
+		// Build the display character by character using ANSI codes
+		var result strings.Builder
+		for i, r := range runes {
+			charStr := string(r)
 
-		// Style for highlighted (target) text - use warning/orange color
-		highlightStyle := lipgloss.NewStyle().
-			Foreground(a.styles.Theme.Warning).
-			Bold(true).
-			Underline(true)
+			// Handle cursor position - show block cursor
+			if i == cursorIdx {
+				charStr = "█"
+			}
 
-		// Text before highlight
-		if highlightStart > 0 {
-			beforeText := string(runes[:highlightStart])
-			// Handle cursor in before section
-			if cursorIdx >= 0 && cursorIdx < highlightStart {
-				beforeRunes := []rune(beforeText)
-				if cursorIdx < len(beforeRunes) {
-					result += statusStyle.Render(string(beforeRunes[:cursorIdx]) + "█" + string(beforeRunes[cursorIdx+1:]))
-				} else {
-					result += statusStyle.Render(beforeText)
+			// Apply appropriate color based on highlight type
+			if i < len(highlights) {
+				switch highlights[i] {
+				case game.HighlightDelete:
+					result.WriteString(colorRed)
+					result.WriteString(charStr)
+					result.WriteString(colorReset)
+				case game.HighlightChange:
+					result.WriteString(colorOrange)
+					result.WriteString(charStr)
+					result.WriteString(colorReset)
+				case game.HighlightTarget:
+					result.WriteString(colorGreen)
+					result.WriteString(charStr)
+					result.WriteString(colorReset)
+				default:
+					result.WriteString(charStr)
 				}
 			} else {
-				result += statusStyle.Render(beforeText)
+				result.WriteString(charStr)
 			}
 		}
 
-		// Highlighted section
-		if highlightEnd > highlightStart {
-			highlightText := string(runes[highlightStart:highlightEnd])
-			// Handle cursor in highlighted section
-			if cursorIdx >= highlightStart && cursorIdx < highlightEnd {
-				localIdx := cursorIdx - highlightStart
-				highlightRunes := []rune(highlightText)
-				if localIdx < len(highlightRunes) {
-					result += highlightStyle.Render(string(highlightRunes[:localIdx]) + "█" + string(highlightRunes[localIdx+1:]))
-				} else {
-					result += highlightStyle.Render(highlightText)
-				}
-			} else {
-				result += highlightStyle.Render(highlightText)
-			}
+		// Handle cursor at end of text
+		if cursorIdx >= len(runes) {
+			result.WriteString("█")
 		}
 
-		// Text after highlight
-		if highlightEnd < len(runes) {
-			afterText := string(runes[highlightEnd:])
-			// Handle cursor in after section
-			if cursorIdx >= highlightEnd {
-				localIdx := cursorIdx - highlightEnd
-				afterRunes := []rune(afterText)
-				if localIdx >= 0 && localIdx < len(afterRunes) {
-					result += statusStyle.Render(string(afterRunes[:localIdx]) + "█" + string(afterRunes[localIdx+1:]))
-				} else if localIdx >= len(afterRunes) {
-					result += statusStyle.Render(afterText + "█")
-				} else {
-					result += statusStyle.Render(afterText)
-				}
-			} else {
-				result += statusStyle.Render(afterText)
-			}
-		}
-
-		return result
+		return result.String()
 	}
 
-	// No highlighting - just render with cursor
+	// Buffer has been modified - no highlighting, just show with cursor
 	var displayBuffer string
 	if cursorIdx >= 0 && cursorIdx < len(runes) {
 		displayBuffer = string(runes[:cursorIdx]) + "█" + string(runes[cursorIdx+1:])
@@ -807,6 +783,49 @@ func (a *App) renderBufferWithHighlight(text string, cursorIdx int, task *game.T
 	}
 
 	return statusStyle.Render(displayBuffer)
+}
+
+// renderDesiredWithHighlight renders the desired text with highlighting
+// White/bright = characters that need to be inserted, Green = base color
+func (a *App) renderDesiredWithHighlight(task *game.Task) string {
+	runes := []rune(task.Desired)
+	highlights := task.GetDesiredHighlights()
+
+	// Define ANSI color codes
+	const (
+		colorReset  = "\033[0m"
+		colorGreen  = "\033[32m"       // Green for base desired text
+		colorWhite  = "\033[1;37m"     // Bold white for insertions
+		colorOrange = "\033[1;33m"     // Bold orange for changes
+	)
+
+	var result strings.Builder
+	for i, r := range runes {
+		charStr := string(r)
+
+		if i < len(highlights) {
+			switch highlights[i] {
+			case game.HighlightInsert:
+				result.WriteString(colorWhite)
+				result.WriteString(charStr)
+				result.WriteString(colorReset)
+			case game.HighlightChange:
+				result.WriteString(colorOrange)
+				result.WriteString(charStr)
+				result.WriteString(colorReset)
+			default:
+				result.WriteString(colorGreen)
+				result.WriteString(charStr)
+				result.WriteString(colorReset)
+			}
+		} else {
+			result.WriteString(colorGreen)
+			result.WriteString(charStr)
+			result.WriteString(colorReset)
+		}
+	}
+
+	return result.String()
 }
 
 func formatDuration(d time.Duration) string {

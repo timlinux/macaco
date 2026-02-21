@@ -17,6 +17,17 @@ const (
 	CategoryComplex TaskCategory = "complex"
 )
 
+// CharHighlight represents how a character should be highlighted
+type CharHighlight int
+
+const (
+	HighlightNone   CharHighlight = iota // No highlighting
+	HighlightDelete                      // Red - character needs to be deleted
+	HighlightChange                      // Orange - character needs to be changed
+	HighlightTarget                      // Green - cursor target position (for motion tasks)
+	HighlightInsert                      // White - character needs to be inserted (shown in desired text)
+)
+
 // Task represents a vim training task
 type Task struct {
 	ID             string       `json:"id"`
@@ -26,8 +37,8 @@ type Task struct {
 	Desired        string       `json:"desired"`
 	CursorStart    int          `json:"cursor_start"`
 	CursorEnd      int          `json:"cursor_end,omitempty"`       // For motion tasks
-	HighlightStart int          `json:"highlight_start,omitempty"` // Start of text to modify
-	HighlightEnd   int          `json:"highlight_end,omitempty"`   // End of text to modify
+	HighlightStart int          `json:"highlight_start,omitempty"` // Start of text to modify (legacy)
+	HighlightEnd   int          `json:"highlight_end,omitempty"`   // End of text to modify (legacy)
 	OptimalKeys    string       `json:"optimal_keys"`
 	OptimalCount   int          `json:"optimal_count"`
 	Description    string       `json:"description"`
@@ -45,16 +56,161 @@ func (t *Task) HasHighlight() bool {
 	return t.HighlightEnd > t.HighlightStart
 }
 
-// GetHighlightedText returns the text that should be highlighted
-func (t *Task) GetHighlightedText() string {
-	if !t.HasHighlight() {
-		return ""
+// GetCharHighlights returns a slice of highlight types for each character
+// Red = delete, Orange = change, Green = cursor target
+func (t *Task) GetCharHighlights() []CharHighlight {
+	initialRunes := []rune(t.Initial)
+	desiredRunes := []rune(t.Desired)
+	highlights := make([]CharHighlight, len(initialRunes))
+
+	// For motion tasks, highlight the target cursor position in green
+	if t.IsMotionTask() {
+		if t.CursorEnd >= 0 && t.CursorEnd < len(highlights) {
+			highlights[t.CursorEnd] = HighlightTarget
+		}
+		return highlights
 	}
-	runes := []rune(t.Initial)
-	if t.HighlightStart >= len(runes) || t.HighlightEnd > len(runes) {
-		return ""
+
+	// Compare initial and desired to determine character-level changes
+	// This is a simplified diff - compare character by character
+
+	// Find common prefix
+	commonPrefix := 0
+	for commonPrefix < len(initialRunes) && commonPrefix < len(desiredRunes) {
+		if initialRunes[commonPrefix] != desiredRunes[commonPrefix] {
+			break
+		}
+		commonPrefix++
 	}
-	return string(runes[t.HighlightStart:t.HighlightEnd])
+
+	// Find common suffix
+	commonSuffix := 0
+	for commonSuffix < len(initialRunes)-commonPrefix && commonSuffix < len(desiredRunes)-commonPrefix {
+		if initialRunes[len(initialRunes)-1-commonSuffix] != desiredRunes[len(desiredRunes)-1-commonSuffix] {
+			break
+		}
+		commonSuffix++
+	}
+
+	// Characters in the middle section need attention
+	initialMidStart := commonPrefix
+	initialMidEnd := len(initialRunes) - commonSuffix
+	desiredMidStart := commonPrefix
+	desiredMidEnd := len(desiredRunes) - commonSuffix
+
+	// If desired middle is empty, all initial middle chars need deletion (red)
+	if desiredMidEnd <= desiredMidStart {
+		for i := initialMidStart; i < initialMidEnd; i++ {
+			highlights[i] = HighlightDelete
+		}
+	} else if initialMidEnd <= initialMidStart {
+		// If initial middle is empty, nothing to highlight (it's an insert)
+		// No characters in initial to highlight
+	} else {
+		// Both have middle sections - compare them
+		initialMid := initialRunes[initialMidStart:initialMidEnd]
+		desiredMid := desiredRunes[desiredMidStart:desiredMidEnd]
+
+		// If lengths are equal, it's likely a change operation
+		if len(initialMid) == len(desiredMid) {
+			for i := 0; i < len(initialMid); i++ {
+				if initialMid[i] != desiredMid[i] {
+					highlights[initialMidStart+i] = HighlightChange
+				}
+			}
+		} else if len(initialMid) > len(desiredMid) {
+			// More characters in initial - some need deletion
+			// Mark excess as delete, and any remaining differences as change
+			for i := 0; i < len(desiredMid); i++ {
+				if initialMid[i] != desiredMid[i] {
+					highlights[initialMidStart+i] = HighlightChange
+				}
+			}
+			for i := len(desiredMid); i < len(initialMid); i++ {
+				highlights[initialMidStart+i] = HighlightDelete
+			}
+		} else {
+			// Fewer characters in initial - it's a change/replacement
+			for i := 0; i < len(initialMid); i++ {
+				highlights[initialMidStart+i] = HighlightChange
+			}
+		}
+	}
+
+	return highlights
+}
+
+// GetDesiredHighlights returns a slice of highlight types for each character in the desired text
+// This is used to show what needs to be inserted (white highlighting)
+func (t *Task) GetDesiredHighlights() []CharHighlight {
+	initialRunes := []rune(t.Initial)
+	desiredRunes := []rune(t.Desired)
+	highlights := make([]CharHighlight, len(desiredRunes))
+
+	// For motion tasks, no highlighting needed on desired
+	if t.IsMotionTask() {
+		return highlights
+	}
+
+	// Find common prefix
+	commonPrefix := 0
+	for commonPrefix < len(initialRunes) && commonPrefix < len(desiredRunes) {
+		if initialRunes[commonPrefix] != desiredRunes[commonPrefix] {
+			break
+		}
+		commonPrefix++
+	}
+
+	// Find common suffix
+	commonSuffix := 0
+	for commonSuffix < len(initialRunes)-commonPrefix && commonSuffix < len(desiredRunes)-commonPrefix {
+		if initialRunes[len(initialRunes)-1-commonSuffix] != desiredRunes[len(desiredRunes)-1-commonSuffix] {
+			break
+		}
+		commonSuffix++
+	}
+
+	// Characters in the middle section of desired that differ need highlighting
+	initialMidStart := commonPrefix
+	initialMidEnd := len(initialRunes) - commonSuffix
+	desiredMidStart := commonPrefix
+	desiredMidEnd := len(desiredRunes) - commonSuffix
+
+	// If initial middle is empty or smaller, the desired middle contains insertions
+	if initialMidEnd <= initialMidStart {
+		// Pure insertion - mark all desired middle chars as insert
+		for i := desiredMidStart; i < desiredMidEnd; i++ {
+			highlights[i] = HighlightInsert
+		}
+	} else if desiredMidEnd > desiredMidStart {
+		// Both have middle sections
+		initialMid := initialRunes[initialMidStart:initialMidEnd]
+		desiredMid := desiredRunes[desiredMidStart:desiredMidEnd]
+
+		if len(desiredMid) > len(initialMid) {
+			// More characters in desired - some are insertions
+			// Mark the extra characters as insert
+			for i := len(initialMid); i < len(desiredMid); i++ {
+				highlights[desiredMidStart+i] = HighlightInsert
+			}
+			// Mark changed characters
+			for i := 0; i < len(initialMid); i++ {
+				if initialMid[i] != desiredMid[i] {
+					highlights[desiredMidStart+i] = HighlightChange
+				}
+			}
+		} else if len(desiredMid) == len(initialMid) {
+			// Same length - mark changes
+			for i := 0; i < len(desiredMid); i++ {
+				if initialMid[i] != desiredMid[i] {
+					highlights[desiredMidStart+i] = HighlightChange
+				}
+			}
+		}
+		// If desiredMid is shorter, nothing to highlight in desired (it's a delete)
+	}
+
+	return highlights
 }
 
 // TaskDatabase holds all available tasks
