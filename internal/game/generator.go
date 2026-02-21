@@ -408,6 +408,9 @@ func (g *TaskGenerator) GenerateDeleteTask(difficulty int) Task {
 			// Remove the word and the space after it
 			task.Desired = strings.Replace(sentence, wordToDelete+" ", "", 1)
 			task.CursorStart = startIdx
+			// Highlight the word to be deleted (including trailing space)
+			task.HighlightStart = startIdx
+			task.HighlightEnd = startIdx + len(wordToDelete) + 1 // +1 for space
 			task.OptimalKeys = "dw"
 			task.OptimalCount = 2
 			task.Description = "Delete word"
@@ -420,6 +423,9 @@ func (g *TaskGenerator) GenerateDeleteTask(difficulty int) Task {
 				task.Initial = sentence
 				task.Desired = sentence[:pos] + sentence[pos+1:]
 				task.CursorStart = pos
+				// Highlight the character to be deleted
+				task.HighlightStart = pos
+				task.HighlightEnd = pos + 1
 				task.OptimalKeys = "x"
 				task.OptimalCount = 1
 				task.Description = "Delete character"
@@ -441,10 +447,16 @@ func (g *TaskGenerator) GenerateDeleteTask(difficulty int) Task {
 			// daw removes word and surrounding space
 			if wordIdx == 0 {
 				task.Desired = strings.TrimPrefix(sentence, wordToDelete+" ")
+				task.HighlightStart = 0
+				task.HighlightEnd = len(wordToDelete) + 1
 			} else if wordIdx == len(words)-1 {
 				task.Desired = strings.TrimSuffix(sentence, " "+wordToDelete)
+				task.HighlightStart = startIdx - 1 // Include leading space
+				task.HighlightEnd = startIdx + len(wordToDelete)
 			} else {
 				task.Desired = strings.Replace(sentence, " "+wordToDelete, "", 1)
+				task.HighlightStart = startIdx - 1 // Include leading space
+				task.HighlightEnd = startIdx + len(wordToDelete)
 			}
 			task.CursorStart = cursorPos
 			task.OptimalKeys = "daw"
@@ -463,6 +475,9 @@ func (g *TaskGenerator) GenerateDeleteTask(difficulty int) Task {
 			task.Initial = sentence
 			task.Desired = sentence[wordStart:]
 			task.CursorStart = 0
+			// Highlight from cursor to target
+			task.HighlightStart = 0
+			task.HighlightEnd = wordStart
 			task.OptimalKeys = fmt.Sprintf("dt%c", targetChar)
 			task.OptimalCount = 3
 			task.Description = fmt.Sprintf("Delete until '%c'", targetChar)
@@ -498,6 +513,9 @@ func (g *TaskGenerator) GenerateChangeTask(difficulty int) Task {
 			task.Initial = sentence
 			task.Desired = strings.Replace(sentence, oldWord, replacement, 1)
 			task.CursorStart = startIdx
+			// Highlight the word to be changed
+			task.HighlightStart = startIdx
+			task.HighlightEnd = startIdx + len(oldWord)
 			task.OptimalKeys = fmt.Sprintf("cw%s<ESC>", replacement)
 			task.OptimalCount = 2 + len(replacement) + 1 // cw + word + ESC
 			task.Description = fmt.Sprintf("Change word to '%s'", replacement)
@@ -517,6 +535,9 @@ func (g *TaskGenerator) GenerateChangeTask(difficulty int) Task {
 			task.Initial = sentence
 			task.Desired = strings.Replace(sentence, oldWord, replacement, 1)
 			task.CursorStart = cursorPos
+			// Highlight the word to be changed
+			task.HighlightStart = startIdx
+			task.HighlightEnd = startIdx + len(oldWord)
 			task.OptimalKeys = fmt.Sprintf("ciw%s<ESC>", replacement)
 			task.OptimalCount = 3 + len(replacement) + 1
 			task.Description = fmt.Sprintf("Change inner word to '%s'", replacement)
@@ -525,10 +546,13 @@ func (g *TaskGenerator) GenerateChangeTask(difficulty int) Task {
 		}
 
 	default:
-		// Advanced: C, cc
+		// Advanced: C, cc - entire line
 		task.Initial = sentence
 		task.Desired = replacement
 		task.CursorStart = 0
+		// Highlight entire line
+		task.HighlightStart = 0
+		task.HighlightEnd = len(sentence)
 		task.OptimalKeys = fmt.Sprintf("cc%s<ESC>", replacement)
 		task.OptimalCount = 2 + len(replacement) + 1
 		task.Description = "Change entire line"

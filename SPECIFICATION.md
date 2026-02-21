@@ -176,6 +176,13 @@ The application SHALL provide immediate visual feedback on the current buffer st
   - Next task indicator SHALL show the actual next task in the queue (not the current task)
   - For motion tasks in previews, indicate "(move cursor)" instead of showing identical text
 
+**Target Text Highlighting:**
+  - For delete and change tasks, the target text to be modified SHALL be highlighted
+  - Highlighted text SHALL use warning/orange color (#F59E0B) with bold and underline
+  - Highlighting SHALL only appear while buffer matches initial state (not yet modified)
+  - This provides visual pattern recognition for faster task comprehension
+  - Task struct includes `HighlightStart` and `HighlightEnd` fields to define highlight range
+
 - **Character-Level Diff (Optional Enhancement):**
   - Incorrect characters SHALL be underlined in red
   - Missing characters SHALL be indicated with gray placeholders

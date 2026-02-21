@@ -19,23 +19,42 @@ const (
 
 // Task represents a vim training task
 type Task struct {
-	ID           string       `json:"id"`
-	Category     TaskCategory `json:"category"`
-	Difficulty   int          `json:"difficulty"`
-	Initial      string       `json:"initial"`
-	Desired      string       `json:"desired"`
-	CursorStart  int          `json:"cursor_start"`
-	CursorEnd    int          `json:"cursor_end,omitempty"` // For motion tasks
-	OptimalKeys  string       `json:"optimal_keys"`
-	OptimalCount int          `json:"optimal_count"`
-	Description  string       `json:"description"`
-	Hint         string       `json:"hint"`
-	Tags         []string     `json:"tags,omitempty"`
+	ID             string       `json:"id"`
+	Category       TaskCategory `json:"category"`
+	Difficulty     int          `json:"difficulty"`
+	Initial        string       `json:"initial"`
+	Desired        string       `json:"desired"`
+	CursorStart    int          `json:"cursor_start"`
+	CursorEnd      int          `json:"cursor_end,omitempty"`       // For motion tasks
+	HighlightStart int          `json:"highlight_start,omitempty"` // Start of text to modify
+	HighlightEnd   int          `json:"highlight_end,omitempty"`   // End of text to modify
+	OptimalKeys    string       `json:"optimal_keys"`
+	OptimalCount   int          `json:"optimal_count"`
+	Description    string       `json:"description"`
+	Hint           string       `json:"hint"`
+	Tags           []string     `json:"tags,omitempty"`
 }
 
 // IsMotionTask returns true if this is a motion-only task
 func (t *Task) IsMotionTask() bool {
 	return t.Initial == t.Desired && t.CursorEnd > 0
+}
+
+// HasHighlight returns true if the task has text to highlight
+func (t *Task) HasHighlight() bool {
+	return t.HighlightEnd > t.HighlightStart
+}
+
+// GetHighlightedText returns the text that should be highlighted
+func (t *Task) GetHighlightedText() string {
+	if !t.HasHighlight() {
+		return ""
+	}
+	runes := []rune(t.Initial)
+	if t.HighlightStart >= len(runes) || t.HighlightEnd > len(runes) {
+		return ""
+	}
+	return string(runes[t.HighlightStart:t.HighlightEnd])
 }
 
 // TaskDatabase holds all available tasks

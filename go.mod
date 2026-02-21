@@ -1,9 +1,9 @@
 module github.com/timlinux/macaco
 
-go 1.21
+go 1.23.5
 
 require (
-	github.com/charmbracelet/bubbletea v1.3.2
+	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/google/uuid v1.6.0
 )

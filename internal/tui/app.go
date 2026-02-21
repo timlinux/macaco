@@ -429,21 +429,12 @@ func (a *App) renderGame() string {
 	// Current task
 	task := a.session.CurrentTask()
 	if task != nil {
-		// Buffer display - current state with cursor
+		// Buffer display - current state with cursor and highlighting
 		bufferText := a.session.BufferText()
-		statusStyle := a.styles.BufferStyle(a.matchStatus.String())
-
-		// Build display with cursor block
 		cursorIdx := a.session.CursorIndex()
-		runes := []rune(bufferText)
-		var displayBuffer string
-		if cursorIdx >= 0 && cursorIdx < len(runes) {
-			displayBuffer = string(runes[:cursorIdx]) + "█" + string(runes[cursorIdx+1:])
-		} else if cursorIdx >= len(runes) && len(runes) > 0 {
-			displayBuffer = bufferText + "█"
-		} else {
-			displayBuffer = bufferText
-		}
+
+		// Build display buffer with cursor and optional highlighting
+		displayBuffer := a.renderBufferWithHighlight(bufferText, cursorIdx, task)
 
 		// Check if this is a motion task (text stays same, only cursor moves)
 		isMotionTask := task.IsMotionTask()
@@ -467,7 +458,7 @@ func (a *App) renderGame() string {
 
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
-				statusStyle.Render(displayBuffer),
+				displayBuffer,
 				"",
 				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Render(referenceBlock),
 				"",
@@ -479,7 +470,7 @@ func (a *App) renderGame() string {
 
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
-				statusStyle.Render(displayBuffer),
+				displayBuffer,
 				a.styles.Separator.Render("↓"),
 				a.styles.CurrentTask.Foreground(a.styles.Theme.Success).Render(task.Desired),
 				"",
@@ -721,6 +712,102 @@ Press ESC or ? to close this help
 }
 
 // Helper functions
+
+// renderBufferWithHighlight renders the buffer text with cursor and optional highlighting
+// for delete/change tasks, the target text to modify is highlighted in a different color
+func (a *App) renderBufferWithHighlight(text string, cursorIdx int, task *game.Task) string {
+	runes := []rune(text)
+	statusStyle := a.styles.BufferStyle(a.matchStatus.String())
+
+	// If task has highlighting and buffer matches initial (hasn't been modified yet)
+	if task.HasHighlight() && text == task.Initial {
+		highlightStart := task.HighlightStart
+		highlightEnd := task.HighlightEnd
+
+		// Clamp to valid range
+		if highlightStart < 0 {
+			highlightStart = 0
+		}
+		if highlightEnd > len(runes) {
+			highlightEnd = len(runes)
+		}
+
+		// Build the display with highlighting
+		var result string
+
+		// Style for highlighted (target) text - use warning/orange color
+		highlightStyle := lipgloss.NewStyle().
+			Foreground(a.styles.Theme.Warning).
+			Bold(true).
+			Underline(true)
+
+		// Text before highlight
+		if highlightStart > 0 {
+			beforeText := string(runes[:highlightStart])
+			// Handle cursor in before section
+			if cursorIdx >= 0 && cursorIdx < highlightStart {
+				beforeRunes := []rune(beforeText)
+				if cursorIdx < len(beforeRunes) {
+					result += statusStyle.Render(string(beforeRunes[:cursorIdx]) + "█" + string(beforeRunes[cursorIdx+1:]))
+				} else {
+					result += statusStyle.Render(beforeText)
+				}
+			} else {
+				result += statusStyle.Render(beforeText)
+			}
+		}
+
+		// Highlighted section
+		if highlightEnd > highlightStart {
+			highlightText := string(runes[highlightStart:highlightEnd])
+			// Handle cursor in highlighted section
+			if cursorIdx >= highlightStart && cursorIdx < highlightEnd {
+				localIdx := cursorIdx - highlightStart
+				highlightRunes := []rune(highlightText)
+				if localIdx < len(highlightRunes) {
+					result += highlightStyle.Render(string(highlightRunes[:localIdx]) + "█" + string(highlightRunes[localIdx+1:]))
+				} else {
+					result += highlightStyle.Render(highlightText)
+				}
+			} else {
+				result += highlightStyle.Render(highlightText)
+			}
+		}
+
+		// Text after highlight
+		if highlightEnd < len(runes) {
+			afterText := string(runes[highlightEnd:])
+			// Handle cursor in after section
+			if cursorIdx >= highlightEnd {
+				localIdx := cursorIdx - highlightEnd
+				afterRunes := []rune(afterText)
+				if localIdx >= 0 && localIdx < len(afterRunes) {
+					result += statusStyle.Render(string(afterRunes[:localIdx]) + "█" + string(afterRunes[localIdx+1:]))
+				} else if localIdx >= len(afterRunes) {
+					result += statusStyle.Render(afterText + "█")
+				} else {
+					result += statusStyle.Render(afterText)
+				}
+			} else {
+				result += statusStyle.Render(afterText)
+			}
+		}
+
+		return result
+	}
+
+	// No highlighting - just render with cursor
+	var displayBuffer string
+	if cursorIdx >= 0 && cursorIdx < len(runes) {
+		displayBuffer = string(runes[:cursorIdx]) + "█" + string(runes[cursorIdx+1:])
+	} else if cursorIdx >= len(runes) && len(runes) > 0 {
+		displayBuffer = text + "█"
+	} else {
+		displayBuffer = text
+	}
+
+	return statusStyle.Render(displayBuffer)
+}
 
 func formatDuration(d time.Duration) string {
 	m := int(d.Minutes())
