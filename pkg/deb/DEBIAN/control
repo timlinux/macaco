@@ -1,0 +1,10 @@
+Package: macaco
+Version: 1.0.0
+Section: games
+Priority: optional
+Architecture: amd64
+Maintainer: Tim Sutton <tim@kartoza.com>
+Description: MoCaCo - Vim motion training game
+ Master vim motions through competitive practice rounds.
+ Features visual feedback, statistics tracking, and multiple
+ difficulty levels.

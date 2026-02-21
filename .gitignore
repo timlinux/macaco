@@ -1,0 +1,46 @@
+# Binaries
+macaco
+macaco.exe
+bin/
+dist/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Nix
+result
+result-*
+
+# Logs
+*.log
+PROMPT.log
+
+# Documentation build
+site/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Local config
+*.local.json

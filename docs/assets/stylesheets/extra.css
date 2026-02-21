@@ -1,0 +1,111 @@
+/* MoCaCo Custom Styles */
+
+:root {
+  --md-primary-fg-color: #6366f1;
+  --md-accent-fg-color: #8b5cf6;
+}
+
+/* Code blocks with vim command highlighting */
+.vim-command {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+/* Task example boxes */
+.task-example {
+  border-left: 4px solid var(--md-primary-fg-color);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 1em;
+  margin: 1em 0;
+  border-radius: 4px;
+}
+
+.task-example .initial {
+  color: #6b7280;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.task-example .arrow {
+  color: var(--md-primary-fg-color);
+  font-weight: bold;
+  margin: 0 0.5em;
+}
+
+.task-example .desired {
+  color: #10b981;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+/* Keyboard key styling */
+kbd {
+  background: linear-gradient(180deg, #f9fafb 0%, #e5e7eb 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+  color: #1f2937;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  padding: 0.2em 0.5em;
+  white-space: nowrap;
+}
+
+/* Stats table styling */
+.stats-table {
+  width: 100%;
+  margin: 1em 0;
+}
+
+.stats-table th {
+  background: var(--md-primary-fg-color);
+  color: white;
+  padding: 0.75em;
+  text-align: left;
+}
+
+.stats-table td {
+  padding: 0.75em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Grade colors */
+.grade-s { color: #fbbf24; font-weight: bold; }
+.grade-a { color: #10b981; font-weight: bold; }
+.grade-b { color: #0ea5e9; font-weight: bold; }
+.grade-c { color: #f59e0b; font-weight: bold; }
+.grade-d { color: #f97316; font-weight: bold; }
+.grade-f { color: #ef4444; font-weight: bold; }
+
+/* Hero section on home page */
+.hero {
+  text-align: center;
+  padding: 2em 0;
+}
+
+.hero h1 {
+  font-size: 3em;
+  margin-bottom: 0.5em;
+}
+
+/* Terminal mockup */
+.terminal-mockup {
+  background: #0a0e14;
+  color: #b3b1ad;
+  border-radius: 8px;
+  padding: 1em;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+}
+
+.terminal-mockup .prompt {
+  color: #10b981;
+}
+
+.terminal-mockup .command {
+  color: #6366f1;
+}

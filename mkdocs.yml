@@ -1,0 +1,126 @@
+site_name: MoCaCo Documentation
+site_description: Master vim motions through competitive practice
+site_url: https://timlinux.github.io/macaco
+repo_url: https://github.com/timlinux/macaco
+repo_name: timlinux/macaco
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: timlinux
+      repo: macaco
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - First Round: getting-started/first-round.md
+  - Vim Basics:
+    - Modes: vim-basics/modes.md
+    - Motions: vim-basics/motions.md
+    - Operators: vim-basics/operators.md
+    - Text Objects: vim-basics/text-objects.md
+  - Game Mechanics:
+    - Round Types: game-mechanics/rounds.md
+    - Scoring: game-mechanics/scoring.md
+    - Statistics: game-mechanics/statistics.md
+  - Advanced:
+    - Efficiency: advanced/efficiency.md
+    - Patterns: advanced/patterns.md
+    - Strategies: advanced/strategies.md
+  - API:
+    - REST API: api/rest.md
+  - Contributing:
+    - Development: contributing/development.md
+    - Architecture: contributing/architecture.md
+  - About:
+    - Changelog: about/changelog.md
+    - License: about/license.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/timlinux/macaco

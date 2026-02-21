@@ -1,0 +1,214 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-binaries:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/macaco-${{ matrix.suffix }} ./cmd/macaco
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macaco-${{ matrix.suffix }}
+          path: dist/macaco-${{ matrix.suffix }}
+
+  build-deb:
+    name: Build DEB Package
+    runs-on: ubuntu-latest
+    needs: build-binaries
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: macaco-linux-amd64
+          path: dist/
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build DEB package
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p pkg/deb/usr/bin
+          mkdir -p pkg/deb/usr/share/doc/macaco
+          mkdir -p pkg/deb/usr/share/applications
+
+          cp dist/macaco-linux-amd64 pkg/deb/usr/bin/macaco
+          chmod +x pkg/deb/usr/bin/macaco
+
+          cp README.md pkg/deb/usr/share/doc/macaco/
+          cp LICENSE pkg/deb/usr/share/doc/macaco/ || echo "No LICENSE file"
+
+          cat > pkg/deb/DEBIAN/control << EOF
+          Package: macaco
+          Version: ${VERSION}
+          Section: games
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Tim Sutton <tim@kartoza.com>
+          Description: MoCaCo - Vim motion training game
+           Master vim motions through competitive practice rounds.
+           Features visual feedback, statistics tracking, and multiple
+           difficulty levels.
+          EOF
+
+          cat > pkg/deb/usr/share/applications/macaco.desktop << EOF
+          [Desktop Entry]
+          Name=MoCaCo
+          Comment=Vim motion training game
+          Exec=macaco
+          Terminal=true
+          Type=Application
+          Categories=Game;Education;
+          EOF
+
+          dpkg-deb --build pkg/deb dist/macaco_${VERSION}_amd64.deb
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macaco-deb
+          path: dist/*.deb
+
+  build-rpm:
+    name: Build RPM Package
+    runs-on: ubuntu-latest
+    needs: build-binaries
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: macaco-linux-amd64
+          path: dist/
+
+      - name: Install RPM tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build RPM package
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+          cp dist/macaco-linux-amd64 ~/rpmbuild/SOURCES/macaco
+
+          cat > ~/rpmbuild/SPECS/macaco.spec << EOF
+          Name:           macaco
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        Vim motion training game
+
+          License:        MIT
+          URL:            https://github.com/timlinux/macaco
+
+          %description
+          MoCaCo - Master vim motions through competitive practice rounds.
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          cp %{_sourcedir}/macaco %{buildroot}/usr/bin/macaco
+          chmod +x %{buildroot}/usr/bin/macaco
+
+          %files
+          /usr/bin/macaco
+          EOF
+
+          rpmbuild -bb ~/rpmbuild/SPECS/macaco.spec
+
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm dist/ || cp ~/rpmbuild/RPMS/noarch/*.rpm dist/ || true
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macaco-rpm
+          path: dist/*.rpm
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-binaries, build-deb, build-rpm]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find dist -type f \( -name "macaco-*" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release/ \;
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
