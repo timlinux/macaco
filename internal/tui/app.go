@@ -411,14 +411,20 @@ func (a *App) renderGame() string {
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
-	// Previous task (dimmed) - only show if not the first task
+	// Previous task (dimmed) - only show if we have completed at least one task
 	if a.session.CurrentIndex > 0 {
 		if prev := a.session.PreviousTask(); prev != nil {
-			prevText := fmt.Sprintf("%q -> %q", prev.Initial, prev.Desired)
-			b.WriteString(a.styles.PreviousTask.Width(a.width).Render(prevText))
+			var prevText string
+			if prev.IsMotionTask() {
+				prevText = fmt.Sprintf("Previous: %q (cursor moved)", prev.Initial)
+			} else {
+				prevText = fmt.Sprintf("Previous: %q -> %q", prev.Initial, prev.Desired)
+			}
+			b.WriteString(a.styles.PreviousTask.Width(a.width).Align(lipgloss.Center).Render(prevText))
+			b.WriteString("\n")
 		}
 	}
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	// Current task
 	task := a.session.CurrentTask()
@@ -444,7 +450,9 @@ func (a *App) renderGame() string {
 
 		var taskDisplay string
 		if isMotionTask {
-			// For motion tasks, show text with caret directly under it indicating target position
+			// For motion tasks, show:
+			// 1. Current buffer with cursor position
+			// 2. The same text below (reference) with caret showing target
 			targetPos := task.CursorEnd
 
 			// Build caret line: spaces up to target, then ^
@@ -455,10 +463,12 @@ func (a *App) renderGame() string {
 
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
-				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
+				statusStyle.Render(displayBuffer),
+				"",
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Dimmed).Render(task.Desired),
 				a.styles.Hint.Foreground(a.styles.Theme.Warning).Render(caretLine),
 				"",
-				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Align(lipgloss.Center).Render(instruction),
+				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Render(instruction),
 			)
 		} else {
 			// For non-motion tasks, show initial -> desired transformation
@@ -466,16 +476,16 @@ func (a *App) renderGame() string {
 
 			taskDisplay = lipgloss.JoinVertical(
 				lipgloss.Center,
-				statusStyle.Width(a.width-8).Align(lipgloss.Center).Render(displayBuffer),
-				a.styles.Separator.Render("  ↓  "),
-				a.styles.CurrentTask.Foreground(a.styles.Theme.Success).Width(a.width-8).Align(lipgloss.Center).Render(task.Desired),
+				statusStyle.Render(displayBuffer),
+				a.styles.Separator.Render("↓"),
+				a.styles.CurrentTask.Foreground(a.styles.Theme.Success).Render(task.Desired),
 				"",
-				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Align(lipgloss.Center).Render(instruction),
+				a.styles.Subtitle.Foreground(a.styles.Theme.Dimmed).Render(instruction),
 			)
 		}
 
-		b.WriteString(lipgloss.Place(a.width, 10, lipgloss.Center, lipgloss.Center, taskDisplay))
-		b.WriteString("\n\n")
+		b.WriteString(lipgloss.Place(a.width, 12, lipgloss.Center, lipgloss.Center, taskDisplay))
+		b.WriteString("\n")
 
 		// Hint (if enabled)
 		if a.showHint {
@@ -493,7 +503,7 @@ func (a *App) renderGame() string {
 		} else {
 			nextText = fmt.Sprintf("Next: %q -> %q", next.Initial, next.Desired)
 		}
-		b.WriteString(a.styles.NextTask.Width(a.width).Render(nextText))
+		b.WriteString(a.styles.NextTask.Width(a.width).Align(lipgloss.Center).Render(nextText))
 	}
 
 	// Build main content
