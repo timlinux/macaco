@@ -33,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.21'
 
@@ -54,7 +54,7 @@ jobs:
             -o dist/macaco-${{ matrix.suffix }} ./cmd/macaco
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macaco-${{ matrix.suffix }}
           path: dist/macaco-${{ matrix.suffix }}
@@ -66,10 +66,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Linux AMD64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: macaco-linux-amd64
           path: dist/
@@ -117,7 +117,7 @@ jobs:
           dpkg-deb --build pkg/deb dist/macaco_${VERSION}_amd64.deb
 
       - name: Upload DEB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macaco-deb
           path: dist/*.deb
@@ -129,10 +129,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Linux AMD64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: macaco-linux-amd64
           path: dist/
@@ -178,7 +178,7 @@ jobs:
           cp ~/rpmbuild/RPMS/x86_64/*.rpm dist/ || cp ~/rpmbuild/RPMS/noarch/*.rpm dist/ || true
 
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macaco-rpm
           path: dist/*.rpm
@@ -190,10 +190,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist/
 
@@ -204,7 +204,7 @@ jobs:
           ls -la release/
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: release/*
           generate_release_notes: true
